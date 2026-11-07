@@ -3,7 +3,7 @@ package ma.azizi.expeditions.service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-
+import org.springframework.dao.DataIntegrityViolationException;
 import feign.FeignException;
 import ma.azizi.expeditions.client.RouteClient;
 import ma.azizi.expeditions.client.RouteClient.RouteDetails;
@@ -44,6 +44,20 @@ public class ShipmentService {
         verifyRoute(routeId);
         shipment.updateReferences(customerId, routeId);
         return shipmentRepository.save(shipment);
+    }
+    public void delete(Long id) {
+        Shipment shipment = findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Expédition introuvable"));
+
+        try {
+            shipmentRepository.delete(shipment);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cette expédition est encore référencée, notamment par son suivi",
+                    exception);
+        }
     }
 
     private void verifyRoute(Long routeId) {
