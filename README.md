@@ -2,8 +2,7 @@
 
 ## Présentation
 
-Quick-Ship est une application de gestion d’expéditions développée
-dans le cadre du module JEE Avancée à l’EMSI.
+Quick-Ship est une application de gestion d’expéditions.
 
 Elle permet de gérer les clients expéditeurs, les dépôts logistiques,
 les tournées de transport et les colis.
