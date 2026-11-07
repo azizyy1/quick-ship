@@ -40,4 +40,8 @@ public class Shipment {
     public Long getRouteId() {
         return routeId;
     }
+    public void updateReferences(Long customerId, Long routeId) {
+        this.customerId = customerId;
+        this.routeId = routeId;
+    }
 }

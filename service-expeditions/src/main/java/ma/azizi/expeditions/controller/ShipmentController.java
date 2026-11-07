@@ -3,16 +3,17 @@ package ma.azizi.expeditions.controller;
 import java.util.List;
 
 import jakarta.validation.Valid;
-import ma.azizi.expeditions.service.ShipmentService.ShipmentDetails;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import ma.azizi.expeditions.entity.Shipment;
 import ma.azizi.expeditions.service.ShipmentService;
+import ma.azizi.expeditions.service.ShipmentService.ShipmentDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,6 +49,14 @@ public class ShipmentController {
     @GetMapping("/{id}/details")
     public ShipmentDetails findDetails(@PathVariable("id") Long id) {
         return shipmentService.findDetails(id);
+    }
+
+    @PutMapping("/{id}")
+    public Shipment update(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody ShipmentRequest request
+    ) {
+        return shipmentService.update(id, request.customerId(), request.routeId());
     }
 
     public record ShipmentRequest(

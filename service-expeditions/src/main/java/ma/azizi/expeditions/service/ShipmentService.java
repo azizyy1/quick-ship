@@ -32,6 +32,21 @@ public class ShipmentService {
     }
 
     public Shipment create(Long customerId, Long routeId) {
+        verifyRoute(routeId);
+        return shipmentRepository.save(new Shipment(customerId, routeId));
+    }
+
+    public Shipment update(Long id, Long customerId, Long routeId) {
+        Shipment shipment = findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Expédition introuvable"));
+
+        verifyRoute(routeId);
+        shipment.updateReferences(customerId, routeId);
+        return shipmentRepository.save(shipment);
+    }
+
+    private void verifyRoute(Long routeId) {
         try {
             routeClient.getRoute(routeId);
         } catch (FeignException.NotFound exception) {
@@ -41,8 +56,6 @@ public class ShipmentService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY, "Échec de la vérification de la tournée", exception);
         }
-
-        return shipmentRepository.save(new Shipment(customerId, routeId));
     }
 
     public List<Shipment> findAll() {
