@@ -3,6 +3,7 @@ package ma.azizi.expeditions.controller;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import ma.azizi.expeditions.service.ShipmentService.ShipmentDetails;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import ma.azizi.expeditions.entity.Shipment;
@@ -42,6 +43,11 @@ public class ShipmentController {
         return shipmentService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/details")
+    public ShipmentDetails findDetails(@PathVariable("id") Long id) {
+        return shipmentService.findDetails(id);
     }
 
     public record ShipmentRequest(
