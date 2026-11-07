@@ -1,5 +1,8 @@
 package ma.azizi.expeditions.service;
 
+import ma.azizi.expeditions.messaging.ShipmentCreated;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -20,20 +23,26 @@ public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final RouteClient routeClient;
     private final TrackingEntryRepository trackingEntryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
             RouteClient routeClient,
-            TrackingEntryRepository trackingEntryRepository
+            TrackingEntryRepository trackingEntryRepository,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.shipmentRepository = shipmentRepository;
         this.routeClient = routeClient;
         this.trackingEntryRepository = trackingEntryRepository;
+        this.eventPublisher = eventPublisher;
     }
 
+    @Transactional
     public Shipment create(Long customerId, Long routeId) {
         verifyRoute(routeId);
-        return shipmentRepository.save(new Shipment(customerId, routeId));
+        Shipment shipment = shipmentRepository.save(new Shipment(customerId, routeId));
+        eventPublisher.publishEvent(new ShipmentCreated(shipment.getId()));
+        return shipment;
     }
 
     public Shipment update(Long id, Long customerId, Long routeId) {
