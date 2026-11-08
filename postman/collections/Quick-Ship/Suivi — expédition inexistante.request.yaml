@@ -1,0 +1,4 @@
+$kind: http-request
+url: http://localhost:8082/api/shipments/999999/tracking
+method: GET
+order: 24000

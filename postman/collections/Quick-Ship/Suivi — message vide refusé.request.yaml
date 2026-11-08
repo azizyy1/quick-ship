@@ -1,0 +1,7 @@
+$kind: http-request
+url: http://localhost:8082/api/shipments/1/tracking
+method: POST
+body:
+  type: json
+  content: '{"message":""}'
+order: 23000

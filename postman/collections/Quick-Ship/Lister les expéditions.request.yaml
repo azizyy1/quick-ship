@@ -1,0 +1,5 @@
+$kind: http-request
+description: ""
+url: http://localhost:8082/api/shipments
+method: GET
+order: 14000

@@ -1,0 +1,11 @@
+$kind: http-request
+url: http://localhost:8082/api/shipments
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "customerId": 1,
+      "routeId": 999999
+    }
+order: 20000
