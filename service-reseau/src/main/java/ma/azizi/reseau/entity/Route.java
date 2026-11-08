@@ -10,6 +10,9 @@ public class Route {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(nullable = false)
     private String nom;
@@ -44,6 +47,9 @@ public class Route {
     }
 
     public Long getId() { return id; }
+    public long getVersion() {
+        return version;
+    }
     public String getNom() { return nom; }
     public String getVilleDepart() { return villeDepart; }
     public String getVilleArrivee() { return villeArrivee; }
