@@ -1,0 +1,120 @@
+<main>
+  <header>
+    <h1>Tableau de bord</h1>
+    <img class="brand-logo" src="quick-ship-logo.png" alt="Quick Ship" />
+  </header>
+
+  <section>
+    <h2>Tournées</h2>
+
+    <details>
+      <summary>Nouvelle tournée</summary>
+
+      <form (submit)="creerTournee($event)">
+        <p><label>Nom <input name="nom" required /></label></p>
+        <p><label>Ville de départ <input name="villeDepart" required /></label></p>
+        <p><label>Ville d’arrivée <input name="villeArrivee" required /></label></p>
+        <p>
+          <label>
+            Date de départ
+            <input name="dateDepart" type="datetime-local" required />
+          </label>
+        </p>
+        <p>
+          <label>
+            Durée en minutes
+            <input name="dureeEstimee" type="number" min="1" required />
+          </label>
+        </p>
+        <p>
+          <label>
+            Capacité en colis
+            <input name="capaciteColis" type="number" min="1" required />
+          </label>
+        </p>
+
+        <button type="submit" [disabled]="enregistrement()">
+          {{ enregistrement() ? 'Enregistrement…' : 'Créer la tournée' }}
+        </button>
+        <p role="status">{{ messageFormulaire() }}</p>
+      </form>
+    </details>
+
+    @if (chargement()) {
+      <p>Chargement des tournées…</p>
+    } @else if (erreur()) {
+      <p role="alert">{{ erreur() }}</p>
+      <button type="button" (click)="chargerTournees()">Réessayer</button>
+    } @else {
+      <ul>
+        @for (tournee of tournees(); track tournee.id) {
+          <li>
+            <strong>{{ tournee.villeDepart }} → {{ tournee.villeArrivee }}</strong>
+            <p>{{ tournee.nom }} · {{ tournee.capaciteColis }} colis max.</p>
+          </li>
+        } @empty {
+          <li>Aucune tournée enregistrée.</li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section>
+    <h2>Expéditions</h2>
+
+    <details>
+      <summary>Nouvelle expédition</summary>
+
+      <form (submit)="creerExpedition($event)">
+        <p>
+          <label>
+            Identifiant client
+            <input name="customerId" type="number" min="1" required />
+          </label>
+        </p>
+        <p>
+          <label>
+            Tournée
+            <select name="routeId" required>
+              <option value="">Choisir une tournée</option>
+              @for (tournee of tournees(); track tournee.id) {
+                <option [value]="tournee.id">
+                  #{{ tournee.id }} · {{ tournee.nom }} ·
+                  {{ tournee.villeDepart }} → {{ tournee.villeArrivee }}
+                </option>
+              }
+            </select>
+          </label>
+        </p>
+
+        <button
+          type="submit"
+          [disabled]="expeditionEnCours() || tournees().length === 0"
+        >
+          {{ expeditionEnCours() ? 'Enregistrement…' : 'Créer l’expédition' }}
+        </button>
+        <p role="status">{{ messageExpedition() }}</p>
+      </form>
+    </details>
+
+    @if (chargementExpeditions()) {
+      <p>Chargement des expéditions…</p>
+    } @else if (erreurExpeditions()) {
+      <p role="alert">{{ erreurExpeditions() }}</p>
+      <button type="button" (click)="chargerExpeditions()">Réessayer</button>
+    } @else {
+      <ul>
+        @for (expedition of expeditions(); track expedition.id) {
+          <li>
+            <strong>Expédition #{{ expedition.id }}</strong>
+            <p>
+              {{ libelleTournee(expedition.routeId) }} · Client #{{ expedition.customerId }}
+            </p>
+          </li>
+        } @empty {
+          <li>Aucune expédition enregistrée.</li>
+        }
+      </ul>
+    }
+  </section>
+</main>
