@@ -14,6 +14,11 @@ interface Expedition {
   routeId: number;
 }
 
+interface Client {
+  id: number;
+  nom: string;
+}
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -32,17 +37,22 @@ export class App implements OnInit {
   readonly expeditionEnCours = signal(false);
   readonly messageExpedition = signal('');
 
+  readonly clients = signal<Client[]>([]);
+  readonly chargementClients = signal(true);
+  readonly erreurClients = signal('');
+
+  ngOnInit(): void {
+    void this.chargerTournees();
+    void this.chargerExpeditions();
+    void this.chargerClients();
+  }
+
   libelleTournee(routeId: number): string {
     const tournee = this.tournees().find((item) => item.id === routeId);
 
     return tournee
       ? `${tournee.villeDepart} → ${tournee.villeArrivee}`
       : `Tournée #${routeId}`;
-  }
-
-  ngOnInit(): void {
-    void this.chargerTournees();
-    void this.chargerExpeditions();
   }
 
   async chargerTournees(): Promise<void> {
@@ -63,6 +73,48 @@ export class App implements OnInit {
       );
     } finally {
       this.chargement.set(false);
+    }
+  }
+
+  async chargerExpeditions(): Promise<void> {
+    this.chargementExpeditions.set(true);
+    this.erreurExpeditions.set('');
+
+    try {
+      const reponse = await fetch('/api/shipments');
+
+      if (!reponse.ok) {
+        throw new Error(`Chargement des expéditions refusé (${reponse.status}).`);
+      }
+
+      this.expeditions.set(await reponse.json());
+    } catch (erreur) {
+      this.erreurExpeditions.set(
+        erreur instanceof Error ? erreur.message : 'Impossible de charger les expéditions.',
+      );
+    } finally {
+      this.chargementExpeditions.set(false);
+    }
+  }
+
+  async chargerClients(): Promise<void> {
+    this.chargementClients.set(true);
+    this.erreurClients.set('');
+
+    try {
+      const reponse = await fetch('/api/customers');
+
+      if (!reponse.ok) {
+        throw new Error(`Chargement des clients refusé (${reponse.status}).`);
+      }
+
+      this.clients.set(await reponse.json());
+    } catch (erreur) {
+      this.erreurClients.set(
+        erreur instanceof Error ? erreur.message : 'Impossible de charger les clients.',
+      );
+    } finally {
+      this.chargementClients.set(false);
     }
   }
 
@@ -106,27 +158,6 @@ export class App implements OnInit {
       this.messageFormulaire.set('Impossible de joindre le Gateway.');
     } finally {
       this.enregistrement.set(false);
-    }
-  }
-
-  async chargerExpeditions(): Promise<void> {
-    this.chargementExpeditions.set(true);
-    this.erreurExpeditions.set('');
-
-    try {
-      const reponse = await fetch('/api/shipments');
-
-      if (!reponse.ok) {
-        throw new Error(`Chargement des expéditions refusé (${reponse.status}).`);
-      }
-
-      this.expeditions.set(await reponse.json());
-    } catch (erreur) {
-      this.erreurExpeditions.set(
-        erreur instanceof Error ? erreur.message : 'Impossible de charger les expéditions.',
-      );
-    } finally {
-      this.chargementExpeditions.set(false);
     }
   }
 
