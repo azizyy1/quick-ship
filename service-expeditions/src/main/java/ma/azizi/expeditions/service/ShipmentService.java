@@ -5,7 +5,6 @@ import ma.azizi.expeditions.client.RouteClient;
 import ma.azizi.expeditions.client.RouteClient.RouteDetails;
 import ma.azizi.expeditions.entity.Shipment;
 import ma.azizi.expeditions.messaging.ShipmentCreated;
-import ma.azizi.expeditions.repository.RouteProjectionRepository;
 import ma.azizi.expeditions.repository.ShipmentRepository;
 import ma.azizi.expeditions.repository.TrackingEntryRepository;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,20 +23,17 @@ public class ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
     private final RouteClient routeClient;
-    private final RouteProjectionRepository routeProjectionRepository;
     private final TrackingEntryRepository trackingEntryRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
             RouteClient routeClient,
-            RouteProjectionRepository routeProjectionRepository,
             TrackingEntryRepository trackingEntryRepository,
             ApplicationEventPublisher eventPublisher
     ) {
         this.shipmentRepository = shipmentRepository;
         this.routeClient = routeClient;
-        this.routeProjectionRepository = routeProjectionRepository;
         this.trackingEntryRepository = trackingEntryRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -78,13 +74,18 @@ public class ShipmentService {
     private void verifyRoute(Long routeId) {
         if (routeId == null) {
             throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "L'identifiant de la tournée est obligatoire");
+                    HttpStatus.BAD_REQUEST, "L’identifiant de la tournée est obligatoire");
         }
 
-        routeProjectionRepository.findById(routeId)
-                .filter(route -> !route.isDeleted())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Tournée introuvable ou supprimée"));
+        try {
+            routeClient.getRoute(routeId);
+        } catch (FeignException.NotFound exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Tournée introuvable", exception);
+        } catch (FeignException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY, "Impossible de vérifier la tournée", exception);
+        }
     }
 
     public List<Shipment> findAll() {
