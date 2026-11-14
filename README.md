@@ -206,7 +206,7 @@ l’en-tête `Idempotency-Key`. La Gateway limite le débit des requêtes sur
 
 ## Démarrage local
 
-Les ports ci-dessous correspondent à l’environnement de démonstration. Le démarrage complet depuis un clone neuf reste à vérifier.
+Les commandes ci-dessous utilisent les ports de la démonstration locale. La section suivante décrit les paramètres du test depuis un clone neuf.
 
 Prévoir Java 17 ou supérieur, ainsi que RabbitMQ sur `localhost:5672` et Redis
 sur `127.0.0.1:6379`. Les commandes utilisent le Maven Wrapper de chaque module.
@@ -223,6 +223,42 @@ qui en dépendent.
 | Clients | `cd client && sh ./mvnw spring-boot:run '-Dspring-boot.run.arguments=--server.port=8082'` | 8082 |
 | Expéditions | `cd service-expeditions && sh ./mvnw spring-boot:run` | 8084 |
 | Gateway | `cd gateway-service && sh ./mvnw spring-boot:run` | 8080 |
+
+### Reproduire le test depuis un clone neuf
+
+Le test depuis un clone neuf a utilisé les ports ci-dessous. Lancer chaque
+commande depuis la racine du clone, dans un terminal distinct. Démarrer RabbitMQ
+et Redis au préalable. Démarrer Config Server et Eureka avant Réseau et Clients,
+puis lancer Expéditions et la Gateway. Une instance Eureka disponible sur
+`8761` peut être réutilisée.
+
+| Application | Commande depuis la racine du clone | Port |
+|---|---|---|
+| Config Server | `(cd config-server && SERVER_PORT=18888 SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS="file:$PWD/../config-repo" sh ./mvnw spring-boot:run)` | 18888 |
+| Réseau | `(cd service-reseau && SERVER_PORT=18081 SPRING_CONFIG_IMPORT=configserver:http://localhost:18888 sh ./mvnw spring-boot:run)` | 18081 |
+| Clients | `(cd client && SERVER_PORT=18082 sh ./mvnw spring-boot:run)` | 18082 |
+| Expéditions | `(cd service-expeditions && SERVER_PORT=18084 SERVICES_RESEAU_URL=http://localhost:18081 SERVICES_CLIENTS_URL=http://localhost:18082 sh ./mvnw spring-boot:run)` | 18084 |
+| Gateway | `(cd gateway-service && SERVER_PORT=18080 EXPEDITIONS_URL=http://localhost:18084 sh ./mvnw spring-boot:run)` | 18080 |
+
+Vérifier que `GET http://localhost:18888/service-reseau/default` indique le
+fichier `config-repo/service-reseau.properties` du clone dans
+`propertySources`. Le fichier fournit le port `8081`, et
+`SERVER_PORT=18081` fixe le port d’écoute de Réseau pour ce test.
+
+Pour tester les notifications, garder uniquement Expéditions du clone actif
+sur le broker RabbitMQ utilisé pour la démo. Si l’instance d’origine tourne
+aussi sur `8084`, l’arrêter avant la livraison. Deux instances avec des bases
+distinctes et la même file RabbitMQ peuvent traiter chacune des messages de
+l’autre environnement.
+
+Le parcours validé dans Postman a créé un client sur `18082`, une tournée sur
+`18081` et une expédition sur `18084`. La lecture directe sur `18084` et
+la lecture via la Gateway sur `18080` ont renvoyé les mêmes expéditions.
+Après livraison via la Gateway, la requête
+`GET http://localhost:18080/api/shipment-notifications?customerId=1` a renvoyé
+`200 OK` avec la notification `2:LIVRE`. Pour rejouer les exemples ci-dessous
+avec le clone, utiliser `18082` pour Clients, `18081` pour Réseau et
+`18080` pour la Gateway, puis reprendre les identifiants renvoyés par l’API.
 
 ## Démonstration de l’API
 
