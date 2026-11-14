@@ -1,215 +1,49 @@
-# Quick-Ship — Gestion et suivi de colis
+# Quick Ship
 
-## Présentation
+Quick Ship est un projet JEE de gestion et de suivi d’expéditions. Il permet de gérer les clients, les dépôts et les tournées, de créer une expédition et de suivre son parcours jusqu’à la livraison ou au retour.
 
-Quick-Ship est une application de gestion d’expéditions.
+## Fonctionnalités
 
-Elle permet de gérer les clients expéditeurs, les dépôts logistiques,
-les tournées de transport et les colis.
+- Gestion des dépôts et des tournées dans le service Réseau.
+- Gestion des clients expéditeurs dans le service Clients.
+- Création d’expéditions et gestion de leur historique de suivi.
+- Validation du client et de la tournée par des appels OpenFeign lors de la création.
+- Transitions du statut `EN_ATTENTE` vers `EN_TRANSIT`, puis vers `LIVRE` ou `RETOUR` dans les scénarios testés.
+- Notifications asynchrones de livraison et de retour via RabbitMQ.
+- Création idempotente avec l’en-tête `Idempotency-Key`. Un rejeu avec la même clé et le même corps renvoie le même identifiant.
+- Limitation de débit sur `/api/routes` dans la Gateway avec Redis.
 
-Chaque colis possède un numéro de suivi unique. Son parcours est
-enregistré jusqu’à sa livraison, son retour ou sa déclaration de perte.
-Un colis perdu ou retourné déclenche une réclamation client.
+## Architecture
 
-## Fonctionnalités prévues
+| Module | Responsabilité |
+|---|---|
+| `gateway-service` | Point d’entrée des API, routage et limitation de débit |
+| `service-reseau` | Dépôts et tournées |
+| `client` | Clients expéditeurs |
+| `service-expeditions` | Expéditions, suivi et notifications |
+| `eureka-server` | Registre et découverte de services |
+| `config-server` et `config-repo` | Configuration centralisée du service Réseau |
 
-- Gestion des dépôts et des tournées datées.
-- Gestion des clients expéditeurs.
-- Création d’une expédition avec calcul du montant côté serveur.
-- Vérification du client et réservation de capacité avant départ.
-- Suivi des différentes étapes du transport.
-- Gestion des livraisons, retours et pertes.
-- Consultation d’un colis enrichie avec le client, la tournée,
-  les étapes de suivi et les réclamations.
-- Notifications asynchrones.
-
-## Cycle de vie cible d’un colis
-
-Un colis commence à l’état EN_ATTENTE.
-Après réservation de capacité sur une tournée, il passe à EN_TRANSIT.
-Il peut ensuite devenir LIVRE, RETOUR ou PERDU.
-
-## Services et ports de démonstration
-
-| Application | Responsabilité | Port |
-|---|---|---|
-| service-reseau | Dépôts et tournées | 8081 |
-| service-expeditions | Colis et étapes de suivi | 8084 |
-| client | Clients expéditeurs | 8082 |
-| eureka-server | Annuaire des services | 8761 |
-| config-server | Configuration centralisée | 8888 |
-| gateway-service | Point d’entrée des API | 8080 |
-
-Chaque service métier possède sa propre base de données.
-Aucun service ne consulte directement la base d’un autre service.
-
-Le Config Server fournit la configuration de Réseau. Les notifications de livraison et de retour sont traitées via RabbitMQ.
-
-## Diagramme de classes métier cible
-
-Les associations à l’intérieur d’un service sont locales.
-Les dépendances entre services sont représentées en pointillés :
-elles indiquent une référence distante sans imposer un protocole.
-
-```mermaid
-classDiagram
-    namespace ServiceReseau {
-        class Depot {
-            Long id
-            String nom
-            String ville
-            Integer capacite
-        }
-
-        class Route {
-            Long id
-            String nom
-            String villeDepart
-            String villeArrivee
-            LocalDateTime dateDepart
-            Integer dureeEstimee
-            Integer capaciteColis
-        }
-    }
-
-    namespace ServiceExpeditions {
-        class Shipment {
-            Long id
-            Long customerId
-            String destinataireNom
-            String adresseDestinataire
-            BigDecimal poids
-            Long routeId
-            BigDecimal montantTransport
-            String numeroSuivi
-            StatutColis statut
-        }
-
-        class TrackingEntry {
-            Long id
-            LocalDateTime date
-            String localisation
-            String commentaire
-        }
-
-        class StatutColis {
-            <<enumeration>>
-            EN_ATTENTE
-            EN_TRANSIT
-            LIVRE
-            RETOUR
-            PERDU
-        }
-    }
-
-    namespace ServiceClients {
-        class Customer {
-            Long id
-            String nom
-            String email
-            BigDecimal encours
-            BigDecimal plafondCredit
-            String statut
-        }
-
-        class Claim {
-            Long id
-            Long shipmentId
-            String description
-            BigDecimal montant
-            String statut
-        }
-    }
-
-    Shipment "1" *-- "0..*" TrackingEntry : suivi
-    Shipment --> StatutColis : statut
-    Customer "1" -- "0..*" Claim : reclamations
-
-    Shipment ..> Customer : customerId
-    Shipment ..> Route : routeId
-    Claim ..> Shipment : shipmentId
-```
-
-Les références distantes customerId, routeId et shipmentId
-sont stockées comme identifiants, sans association JPA interservice.
-
-TrackingEntry appartient localement à Shipment dans service-expeditions.
-Claim appartient localement à Customer dans service-clients.
-
-Dans le périmètre initial, les tournées sont définies par leurs villes.
-Aucune association entre Depot et Route n’est imposée par la fiche.
-
-## Architecture de la démonstration
+Les services métier disposent de bases séparées. Une expédition référence son client et sa tournée par leurs identifiants. OpenFeign sert aux validations synchrones lors de la création. RabbitMQ permet le traitement asynchrone des notifications après un changement de statut.
 
 ```mermaid
 flowchart TB
-    Client["Client API / Postman"] --> Gateway["gateway-service : 8080"]
-
-    Gateway --> Reseau["service-reseau : 8081"]
-    Gateway --> Expeditions["service-expeditions : 8084"]
-    Gateway --> Clients["client : 8082"]
-
-    Reseau --> DBReseau[("Base reseau")]
-    Expeditions --> DBExpeditions[("Base expeditions")]
-    Clients --> DBClients[("Base clients")]
-
-    Gateway -.-> Eureka["eureka-server : 8761"]
-    Reseau -.-> Eureka
-    Clients -.-> Eureka
+    Postman --> Gateway["API Gateway"]
+    Gateway --> Reseau["Service Réseau"]
+    Gateway --> Clients["Service Clients"]
+    Gateway --> Expeditions["Service Expéditions"]
+    Gateway --> Redis["Redis"]
+    Expeditions -->|OpenFeign| Reseau
+    Expeditions -->|OpenFeign| Clients
+    Expeditions -->|Événement de statut| RabbitMQ["RabbitMQ"]
+    RabbitMQ -->|Traitement de la notification| Expeditions
 ```
-
-Les liens en pointillés vers Eureka représentent
-l’enregistrement et la découverte des services.
-
-## Organisation interne
-
-Chaque service métier respecte les couches suivantes :
-
-- Entity : modèle de données local.
-- Repository : accès à la base de données.
-- Service : règles métier et transactions.
-- Controller : exposition des API REST.
-- DTO : validation des entrées et structure des réponses.
-
-## Règles métier principales
-
-- Vérifier l’existence et le statut du client avant le départ.
-- Contrôler son encours par rapport au plafond de crédit.
-- Vérifier la destination et la capacité de la tournée.
-- Réserver atomiquement une unité de capacité avant le départ.
-- Calculer le montant du transport côté serveur.
-- Libérer une seule fois la capacité à la fin du transport.
-- Ajouter une seule fois le montant à l’encours après livraison.
-- Créer une seule réclamation automatique par colis retourné ou perdu.
-- Contrôler les transitions de statut par des opérations métier.
-- Refuser les suppressions incompatibles avec l’historique.
-
-## Plan de réalisation
-
-| Jalon | Contenu |
-|---|---|
-| V0 | Conception, diagrammes et documentation |
-| V1 | CRUD Depot, Route et Customer ; validation avec Postman |
-| V2–V3 | Eureka, Gateway et Config Server |
-| V4 | Expéditions, suivi, réclamations et OpenFeign |
-| V5 | Notifications avec RabbitMQ |
-| V6 | Résilience, Rate Limiting, erreurs et idempotence |
-| V7 | Variante événementielle Kafka créée depuis V3 |
-
-## État actuel
-
-Le parcours validé couvre la gestion des clients et des tournées, la création
-d’expéditions avec validation OpenFeign, le suivi des statuts, les notifications
-RabbitMQ et l’accès aux API via la Gateway. La création d’une expédition accepte
-l’en-tête `Idempotency-Key`. La Gateway limite le débit des requêtes sur
-`/api/routes` avec Redis.
 
 ## Démarrage local
 
-Les ports ci-dessous correspondent à l’environnement de démonstration. Le démarrage complet depuis un clone neuf reste à vérifier.
+Les commandes ci-dessous utilisent les ports de la démonstration locale. La section suivante décrit les paramètres du test depuis un clone neuf.
 
-Prévoir Java 17 ou supérieur, ainsi que RabbitMQ sur `localhost:5672` et Redis
-sur `127.0.0.1:6379`. Les commandes utilisent le Maven Wrapper de chaque module.
+Installer un JDK Java 17 ou supérieur. Démarrer RabbitMQ sur `localhost:5672` et Redis sur `127.0.0.1:6379`. Les commandes utilisent le Maven Wrapper de chaque module.
 
 Depuis la racine du dépôt, lancer chaque commande dans un terminal distinct.
 Attendre le démarrage de Config Server et d’Eureka avant de lancer les services
@@ -224,7 +58,58 @@ qui en dépendent.
 | Expéditions | `cd service-expeditions && sh ./mvnw spring-boot:run` | 8084 |
 | Gateway | `cd gateway-service && sh ./mvnw spring-boot:run` | 8080 |
 
-## Démonstration de l’API
+### Reproduire le test depuis un clone neuf
+
+Le test depuis un clone neuf a utilisé les ports ci-dessous. Lancer chaque
+commande depuis la racine du clone, dans un terminal distinct. Démarrer RabbitMQ
+et Redis au préalable. Démarrer Config Server et Eureka avant Réseau et Clients,
+puis lancer Expéditions et la Gateway. Une instance Eureka disponible sur
+`8761` peut être réutilisée.
+
+| Application | Commande depuis la racine du clone | Port |
+|---|---|---|
+| Eureka | `(cd eureka-server && sh ./mvnw spring-boot:run)` | 8761 |
+| Config Server | `(cd config-server && SERVER_PORT=18888 SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS="file:$PWD/../config-repo" sh ./mvnw spring-boot:run)` | 18888 |
+| Réseau | `(cd service-reseau && SERVER_PORT=18081 SPRING_CONFIG_IMPORT=configserver:http://localhost:18888 sh ./mvnw spring-boot:run)` | 18081 |
+| Clients | `(cd client && SERVER_PORT=18082 sh ./mvnw spring-boot:run)` | 18082 |
+| Expéditions | `(cd service-expeditions && SERVER_PORT=18084 SERVICES_RESEAU_URL=http://localhost:18081 SERVICES_CLIENTS_URL=http://localhost:18082 sh ./mvnw spring-boot:run)` | 18084 |
+| Gateway | `(cd gateway-service && SERVER_PORT=18080 EXPEDITIONS_URL=http://localhost:18084 sh ./mvnw spring-boot:run)` | 18080 |
+
+Vérifier que `GET http://localhost:18888/service-reseau/default` indique le
+fichier `config-repo/service-reseau.properties` du clone dans
+`propertySources`. Le fichier fournit le port `8081`, et
+`SERVER_PORT=18081` fixe le port d’écoute de Réseau pour ce test.
+
+Pour tester les notifications, garder uniquement Expéditions du clone actif
+sur le broker RabbitMQ utilisé pour la démo. Si l’instance d’origine tourne
+aussi sur `8084`, l’arrêter avant la livraison. Deux instances avec des bases
+distinctes et la même file RabbitMQ peuvent traiter chacune des messages de
+l’autre environnement.
+
+Le parcours validé dans Postman a créé un client sur `18082`, une tournée sur
+`18081` et une expédition sur `18084`. La lecture directe sur `18084` et
+la lecture via la Gateway sur `18080` ont renvoyé les mêmes expéditions.
+Après livraison via la Gateway, la requête
+`GET http://localhost:18080/api/shipment-notifications?customerId=1` a renvoyé
+`200 OK` avec la notification `2:LIVRE`. Pour rejouer les exemples ci-dessous
+avec le clone, utiliser `18082` pour Clients, `18081` pour Réseau et
+`18080` pour la Gateway, puis reprendre les identifiants renvoyés par l’API.
+
+## Démo Postman
+
+Dans la collection **Démo**, ouvrir le dossier **Démo Quick Ship**. Renseigner `gatewayUrl` avec `http://localhost:18080` pour le clone ou `http://localhost:8080` pour le démarrage standard. Préparer un client et une tournée avec les exemples de la section suivante, puis reprendre leurs identifiants dans le corps des requêtes de création et de rejeu.
+
+| Étape | Requête | Résultat attendu |
+|---|---|---|
+| 1. Créer | `POST /api/shipments`, avec une clé neuve dans `Idempotency-Key` | `201`, statut `EN_ATTENTE` et ID de l’expédition |
+| 2. Rejouer | Même URL, même clé et même corps | `201`, même ID |
+| 3. Passer en transit | `POST /api/shipments/{{shipmentId}}/transit` | `200`, statut `EN_TRANSIT` |
+| 4. Livrer | `POST /api/shipments/{{shipmentId}}/deliver` | `200`, statut `LIVRE` |
+| 5. Lister les notifications | `GET /api/shipment-notifications?customerId=<id_client>` | `200`, notification `<id_expédition>:LIVRE` après traitement RabbitMQ |
+
+Avant l’étape 3, renseigner la variable de collection `shipmentId` avec l’ID obtenu à l’étape 1. Lors de la démonstration validée sur la Gateway du clone, les deux premières requêtes ont renvoyé l’ID `6` et la dernière a renvoyé la notification `6:LIVRE` pour le client `1`.
+
+## Exemples avec curl
 
 ### Préparer un client et une tournée de test
 
