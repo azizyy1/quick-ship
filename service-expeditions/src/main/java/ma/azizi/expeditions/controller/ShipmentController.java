@@ -9,6 +9,9 @@ import jakarta.validation.constraints.Positive;
 import ma.azizi.expeditions.entity.Shipment;
 import ma.azizi.expeditions.service.ShipmentService;
 import ma.azizi.expeditions.service.ShipmentService.ShipmentDetails;
+import ma.azizi.expeditions.service.ShipmentCreationService;
+import ma.azizi.expeditions.service.ShipmentCreationService.CreatedShipment;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,14 +27,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class ShipmentController {
 
     private final ShipmentService shipmentService;
+    private final ShipmentCreationService shipmentCreationService;
 
-    public ShipmentController(ShipmentService shipmentService) {
+    public ShipmentController(
+            ShipmentService shipmentService,
+            ShipmentCreationService shipmentCreationService
+    ) {
         this.shipmentService = shipmentService;
+        this.shipmentCreationService = shipmentCreationService;
     }
 
     @PostMapping
-    public ResponseEntity<Shipment> create(@Valid @RequestBody ShipmentRequest request) {
-        Shipment shipment = shipmentService.create(request.customerId(), request.routeId());
+    public ResponseEntity<CreatedShipment> create(
+            @RequestHeader(value = "Idempotency-Key", required = false) String key,
+            @Valid @RequestBody ShipmentRequest request
+    ) {
+        CreatedShipment shipment =
+                shipmentCreationService.create(key, request.customerId(), request.routeId());
         return ResponseEntity.status(HttpStatus.CREATED).body(shipment);
     }
 
@@ -58,6 +70,21 @@ public class ShipmentController {
             @Valid @RequestBody ShipmentRequest request
     ) {
         return shipmentService.update(id, request.customerId(), request.routeId());
+    }
+
+    @PostMapping("/{id}/transit")
+    public Shipment startTransit(@PathVariable("id") Long id) {
+        return shipmentService.startTransit(id);
+    }
+
+    @PostMapping("/{id}/deliver")
+    public Shipment deliver(@PathVariable("id") Long id) {
+        return shipmentService.deliver(id);
+    }
+
+    @PostMapping("/{id}/return")
+    public Shipment returnShipment(@PathVariable("id") Long id) {
+        return shipmentService.returnShipment(id);
     }
 
     public record ShipmentRequest(

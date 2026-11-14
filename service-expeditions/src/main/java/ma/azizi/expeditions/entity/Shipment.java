@@ -6,6 +6,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 @Entity
 @Table(name = "shipments")
@@ -20,6 +22,25 @@ public class Shipment {
 
     @Column(nullable = false)
     private Long routeId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private Status status = Status.EN_ATTENTE;
+
+    public enum Status {
+        EN_ATTENTE,
+        EN_TRANSIT,
+        LIVRE,
+        RETOUR
+    }
+
+    public Status getStatus() {
+        return status == null ? Status.EN_ATTENTE : status;
+    }
+
+    public void changeStatus(Status status) {
+        this.status = status;
+    }
 
     protected Shipment() {
     }
