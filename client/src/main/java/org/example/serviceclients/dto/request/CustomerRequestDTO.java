@@ -24,4 +24,6 @@ public class CustomerRequestDTO {
 
     @NotBlank(message = "Le statut est obligatoire")
     private String statut;
+
+    private BigDecimal encours;
 }

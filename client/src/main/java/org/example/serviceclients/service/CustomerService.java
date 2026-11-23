@@ -65,6 +65,7 @@ public class CustomerService {
         customer.setEmail(dto.getEmail());
         customer.setPlafondCredit(dto.getPlafondCredit());
         customer.setStatut(dto.getStatut());
+        customer.setEncours(dto.getEncours());
 
         return mapper.toResponse(
                 repository.save(customer)

@@ -18,9 +18,8 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
     public CustomerResponseDTO createCustomer(
-            @Valid @RequestBody CustomerRequestDTO request) {
+             @RequestBody CustomerRequestDTO request) {
 
         return customerService.create(request);
     }
